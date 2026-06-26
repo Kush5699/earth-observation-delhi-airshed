@@ -1,14 +1,14 @@
 # Earth Observation: Delhi Airshed Land-Use Classification
 
-**AI for Sustainability — SRIP 2026 | IIT Gandhinagar**
+**AI for Sustainability - SRIP 2026 | IIT Gandhinagar**
 
-This project builds a complete land-use classification pipeline for the Delhi-NCR airshed region using multi-spectral satellite imagery from Sentinel-2 and ground-truth labels derived from the ESA WorldCover 2021 land cover product. The core workflow spans spatial data filtering, automated label construction from raster data, and supervised deep learning with a fine-tuned ResNet18 backbone — all implemented from scratch in a single reproducible Jupyter notebook.
+This project builds a complete land-use classification pipeline for the Delhi-NCR airshed region using multi-spectral satellite imagery from Sentinel-2 and ground-truth labels derived from the ESA WorldCover 2021 land cover product. The core workflow spans spatial data filtering, automated label construction from raster data, and supervised deep learning with a fine-tuned ResNet18 backbone, with all components implemented from scratch in a single reproducible Jupyter notebook.
 
 ---
 
 ## Motivation
 
-Air quality monitoring over the Delhi National Capital Region requires a clear understanding of what types of land-use exist across the airshed — sprawling urban zones, agricultural tracts, vegetated corridors, water bodies, and bare/sparse terrain each have different emission and absorption profiles. Manually labelling thousands of satellite patches is impractical, so this project automates the process by cross-referencing high-resolution Sentinel-2 RGB imagery against the ESA WorldCover 10 m classification map and then training a convolutional neural network to predict land-use categories directly from the satellite images.
+Air quality monitoring over the Delhi National Capital Region requires a clear understanding of what types of land-use exist across the airshed. Sprawling urban zones, agricultural tracts, vegetated corridors, water bodies, and bare/sparse terrain each have different emission and absorption profiles. Manually labelling thousands of satellite patches is impractical, so this project automates the process by cross-referencing high-resolution Sentinel-2 RGB imagery against the ESA WorldCover 10 m classification map and then training a convolutional neural network to predict land-use categories directly from the satellite images.
 
 ---
 
@@ -144,7 +144,7 @@ Download the dataset from [Kaggle](https://www.kaggle.com/datasets/rishabhsnip/e
 jupyter notebook earth_observation_notebook.ipynb
 ```
 
-Execute cells sequentially — the notebook is structured in order (Q1 → Q2 → Q3) and each section builds on the outputs of the previous one.
+Execute cells sequentially, as the notebook is structured in order (Q1 -> Q2 -> Q3) and each section builds on the outputs of the previous one.
 
 ---
 
@@ -175,4 +175,4 @@ Execute cells sequentially — the notebook is structured in order (Q1 → Q2 �
 
 **Kush Patel**
 M.Tech-ICT (Machine Learning Specialisation) | Dhirubhai Ambani University
-SRIP 2026 Intern — IIT Gandhinagar
+SRIP 2026 Intern at IIT Gandhinagar

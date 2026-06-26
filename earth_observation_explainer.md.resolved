@@ -1,0 +1,246 @@
+# 🛰️ Earth Observation: Delhi Airshed — Complete Project Guide
+
+> **SRIP 2026 | AI for Sustainability | IIT Gandhinagar**
+> Prof. Nipun Batra's Lab
+
+---
+
+## 🎯 What Is This Project About?
+
+**The Big Picture:** The Ministry of Environment wants to know **what the land around Delhi looks like from space** — where are the buildings? Where are the farms? Where is water? Where are the trees? This helps identify **pollution sources** (factories in built-up areas, crop burning in farmland, etc.).
+
+**Your Job:** Build an AI pipeline that:
+1. Takes **satellite photos** of the Delhi region
+2. Figures out what **type of land** each photo shows (city? farm? forest? water?)
+3. Trains a **CNN model** to automatically classify new satellite images
+
+Think of it like building a **Google Maps + AI** for environmental auditing.
+
+---
+
+## 📦 The 4 Datasets — What Each Contains
+
+### Dataset 1: Delhi-NCR Region Shapefile
+- **Link:** [delhi_ncr_region.geojson](https://www.kaggle.com/datasets/rishabhsnip/earth-observation-delhi-airshed?select=delhi_ncr_region.geojson)
+- **What it is:** A GeoJSON file containing the **geographic boundary** of the Delhi National Capital Region
+- **Think of it as:** An outline/border drawn on a map — like tracing the edge of Delhi-NCR on Google Maps
+- **CRS:** EPSG:4326 (latitude/longitude coordinates)
+- **Size:** ~4.6 MB (detailed boundary with many points)
+- **Why you need it:** To know **which area** we're working in and filter only relevant satellite images
+
+### Dataset 2: Sentinel-2 RGB Image Patches
+- **Link:** [rgb folder](https://www.kaggle.com/datasets/rishabhsnip/earth-observation-delhi-airshed?select=rgb)
+- **What it is:** **9,216 satellite photos** taken by the ESA Sentinel-2 satellite
+- **Each image:** 128×128 pixels, RGB (3 color channels), [.png](file:///C:/Users/kush3/.gemini/antigravity/brain/cef416aa-c801-488e-8cd1-849bcb6d317a/eo_helping_fig1.png) format
+- **Resolution:** 10 meters per pixel → each image covers **1.28 km × 1.28 km** of ground
+- **Filename format:** `latitude_longitude.png` (e.g., `28.2056_76.8558.png`)
+  - This tells you the **center coordinate** of what the image shows
+- **Think of it as:** 9,216 tiny square photos of different parts of Delhi-NCR taken from space, laid out in a grid
+
+### Dataset 3: Delhi Airshed Shapefile
+- **Link:** [delhi_airshed.geojson](https://www.kaggle.com/datasets/rishabhsnip/earth-observation-delhi-airshed?select=delhi_airshed.geojson)
+- **What it is:** Boundary of the **Delhi Airshed** — the atmospheric region where pollution from Delhi spreads
+- **Size:** ~5.8 KB (simpler boundary than NCR)
+- **Think of it as:** A smaller, specific zone within the larger NCR region. The airshed is the area where Delhi's air quality is affected
+- **Why you need it:** Context for the environmental audit (but the main filtering uses the NCR boundary)
+
+### Dataset 4: ESA WorldCover 2021 (land_cover.tif)
+- **Link:** [worldcover_bbox_delhi_ncr_2021.tif](https://www.kaggle.com/datasets/rishabhsnip/earth-observation-delhi-airshed?select=worldcover_bbox_delhi_ncr_2021.tif)
+- **What it is:** A **raster image** where each pixel is labeled with what type of land it represents
+- **Size:** 92 MB, 9600×9602 pixels
+- **Resolution:** 10m/pixel (same as Sentinel-2 images)
+- **Source:** ESA WorldCover 2021 — a global land cover map created by the European Space Agency
+- **Each pixel value is a class code:**
+
+| Code | Land Cover Type | % of Delhi-NCR Area |
+|:---:|:---|:---:|
+| 10 | 🌳 Tree cover | 10.4% |
+| 20 | 🌿 Shrubland | 3.3% |
+| 30 | 🌾 Grassland | 7.1% |
+| 40 | 🌾 Cropland | **53.5%** ← Most common |
+| 50 | 🏙️ Built-up | **23.3%** ← Second |
+| 60 | 🏜️ Bare/sparse vegetation | 1.7% |
+| 80 | 💧 Permanent water | 0.7% |
+| 90 | 🌊 Herbaceous wetland | ~0% |
+
+- **Think of it as:** A "color-by-number" map where each pixel is colored by land type. You use this as the **answer key** — it tells you what label each satellite image should get.
+
+---
+
+## 📊 Helping Figures from the PDF
+
+### Figure 1: Satellite Tile Footprints with Land Cover
+
+![Landcover in Delhi Airshed showing Sentinel-2 tile grid overlaid on the ESA WorldCover map](C:/Users/kush3/.gemini/antigravity/brain/cef416aa-c801-488e-8cd1-849bcb6d317a/eo_helping_fig1.png)
+
+This figure shows:
+- **Yellow grid lines** = the 9,216 Sentinel-2 image tiles (evenly spaced)
+- **Colors** = land cover types from ESA WorldCover
+  - **Pink/Purple** = Cropland (largest area — surrounding Delhi)
+  - **Red** = Built-up areas (concentrated in center — that's Delhi city!)
+  - **Dark green** = Tree cover (forests/parks)
+  - **Yellow** = Grassland
+  - **Blue dots** = Water bodies (Yamuna river visible)
+- **Dark line** = Airshed boundary
+
+### Figure 2: Delhi-NCR Boundary with WorldCover
+
+![ESA WorldCover 2021 overlaid on Delhi NCR boundary](C:/Users/kush3/.gemini/antigravity/brain/cef416aa-c801-488e-8cd1-849bcb6d317a/eo_helping_fig2.png)
+
+This figure shows:
+- **Black outlines** = Delhi-NCR region boundary (multiple districts)
+- **Colored rectangle in center** = The area covered by the WorldCover raster
+- Shows how the satellite data covers only a **portion** of the full NCR region
+
+---
+
+## 📝 Task-by-Task Breakdown
+
+### Q1: Spatial Reasoning & Data Filtering [4 Marks]
+
+#### What You Do:
+
+**Step 1 (2 marks): Plot Delhi-NCR + Grid**
+- Load [delhi_ncr_region.geojson](file:///K:/Summer%20Internship/earth-observation-delhi-airshed/data/delhi_ncr_region.geojson) with GeoPandas
+- Convert to **EPSG:32644** (UTM zone, uses meters instead of degrees)
+- Create a **60×60 km grid** covering the entire NCR boundary
+- Plot the boundary + grid using matplotlib
+
+**Step 2 (1 mark): Filter Images**
+- Load all 9,216 image filenames → extract lat/lon from filename
+- For each image, check: **"Is this coordinate inside the NCR boundary?"**
+- Keep only images that fall inside
+- This is called a **spatial join** — it's like asking "which dots fall inside this shape?"
+
+**Step 3 (1 mark): Report Counts**
+- Print: "Before filtering: 9,216 images"
+- Print: "After filtering: X images" (the ones inside NCR)
+
+#### Why This Matters:
+The satellite images cover a rectangular area, but the NCR region is an irregular shape. Many images are **outside** the boundary and irrelevant. Filtering removes them.
+
+---
+
+### Q2: Label Construction & Dataset Preparation [6 Marks]
+
+#### What You Do:
+
+**Step 1 (2 marks): Extract Land Cover Patch for Each Image**
+- For each filtered satellite image, you know its center coordinate
+- Go to `land_cover.tif` and extract the **128×128 pixel patch** centered at that coordinate
+- Now you have parallel data: satellite image ↔ land cover label patch
+
+**Step 2 (1 mark): Assign Label Using Mode**
+- Each 128×128 label patch has 16,384 pixels, each with a class code (10, 20, 30, etc.)
+- Count which class appears most → that's the **mode** → that's the label
+- Example from PDF:
+  - 8000 pixels = class 50 (Built-up)
+  - 3000 pixels = class 40 (Cropland)
+  - 512 pixels = class 10 (Tree cover)
+  - → Label = **Built-up** (most common)
+
+**Step 3 (1 mark): Simplify ESA Classes**
+- Map the 10+ ESA classes into 5 simplified categories:
+
+| ESA Code(s) | Simplified Category |
+|:---:|:---|
+| 10, 20, 30, 90 | 🌿 **Vegetation** |
+| 40 | 🌾 **Cropland** |
+| 50 | 🏙️ **Built-up** |
+| 80 | 💧 **Water** |
+| 60, 70, 100 | 🔘 **Others** |
+
+**Step 4 (2 marks): Train/Test Split + Visualize**
+- Split dataset: **60% train, 40% test** (random, stratified)
+- Create a bar chart showing class distribution in train and test sets
+
+#### Why This Matters:
+ML models need **labeled data**. The satellite images are the input (X), and the land cover type is the label (Y). You're creating this labeled dataset from raw data.
+
+---
+
+### Q3: Model Training & Evaluation [5 Marks]
+
+#### What You Do:
+
+**Step 1 (2 marks): Train CNN**
+- Use **ResNet18** (pretrained on ImageNet) or build a custom CNN
+- Input: 128×128×3 RGB satellite image
+- Output: One of 5 classes (Built-up, Vegetation, Cropland, Water, Others)
+- Use data augmentation (flips, rotations) since satellite images look the same from any direction
+- Use class-weighted loss because classes are imbalanced (53% Cropland vs 0.7% Water)
+
+**Step 2 (2 marks): Metrics**
+- **Accuracy:** Overall percentage correct
+- **F1-Score:** Harmonic mean of precision and recall (handles imbalance better)
+
+**Step 3 (1 mark): Confusion Matrix + Interpretation**
+- 5×5 matrix showing predictions vs actual labels
+- Write 3-4 sentences explaining:
+  - Which classes are easy to classify (Water — very distinct blue appearance)
+  - Which classes get confused (Cropland ↔ Vegetation — both green)
+  - Overall model performance
+
+---
+
+## 📊 Expected Results
+
+Based on this dataset, you should expect:
+
+| Metric | Expected Range |
+|:---|:---|
+| **Accuracy** | 70–85% |
+| **F1-Score (macro)** | 0.55–0.75 |
+| **Best classified** | Water, Built-up (distinct spectral signatures) |
+| **Most confused** | Cropland ↔ Vegetation (both green in RGB) |
+| **Worst classified** | Others (heterogeneous mix of rare classes) |
+
+**Why not 95%+?**
+- Using only RGB (3 bands). Sentinel-2 actually has 13 bands — more bands help distinguish Vegetation vs Cropland
+- 128×128 patches often contain **mixed** land cover (e.g., 60% Cropland + 40% Built-up)
+- The "Others" class groups very different land types together
+
+---
+
+## 🔑 Concepts You Must Understand (for the Interview)
+
+### 1. Coordinate Reference Systems (CRS)
+- **EPSG:4326** = lat/lon in degrees → what GPS uses
+- **EPSG:32644** = UTM Zone 44N → meters → needed for the 60km grid
+- Why convert? You can't make a "60 km" grid in degrees because 1° longitude ≠ 1° latitude in km
+
+### 2. Raster vs Vector Data
+- **Vector** = shapefiles/GeoJSON → boundaries drawn as points/lines/polygons
+- **Raster** = TIF images → grid of pixels with values
+
+### 3. Spatial Join
+- Testing if a point (image center) falls inside a polygon (NCR boundary)
+- GeoPandas: `gpd.sjoin(points, polygon, predicate='within')`
+
+### 4. Band-pass Filtering / Mode Label Assignment
+- The "mode" is the most frequent value → simpler than average for categorical data
+- Like asking "what does this patch **mostly** look like?"
+
+### 5. Transfer Learning (ResNet18)
+- Don't train from scratch → use ImageNet weights → fine-tune on your data
+- Freeze early layers (generic features) → train later layers (task-specific)
+
+### 6. Class Imbalance
+- Cropland = 53% but Water = 0.7%
+- Without weighted loss, the model would just predict "Cropland" for everything and get 53% accuracy
+- Class-weighted CrossEntropy penalizes more for getting rare classes wrong
+
+---
+
+## 🎬 Interactive Simulation
+
+I've created an interactive web simulation that walks you through the entire pipeline visually:
+
+👉 **[Open the simulation](file:///K:/Summer%20Internship/earth_observation_simulation/index.html)**
+
+The simulation covers:
+- How satellite images are arranged on the map
+- How spatial filtering works (which images fall inside the boundary)
+- How land cover labels are extracted from the TIF
+- How the CNN classifies images
+- The confusion matrix results

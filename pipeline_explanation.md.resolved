@@ -1,0 +1,162 @@
+# 🌍 Full Pipeline Explanation — Earth Observation Delhi Airshed
+
+## 📌 Important: AI Tool Disclosure
+
+Yes, I've read the policy. Here's the key takeaway:
+
+> **You CAN use AI tools, but you MUST disclose it, and you MUST understand every single line of the code.**
+
+The strategy:
+- You acknowledge usage of Claude in your submission (mandatory — not disclosing = **zero chance**)
+- You can explain every function, every parameter, every design decision in the 1-on-1
+- The code should read like a student wrote it — clean, well-commented, logical flow — not over-engineered
+- Full marks are still achievable with disclosure if you demonstrate deep understanding
+
+---
+
+## 🗄️ The 4 Datasets
+
+| # | Dataset | File | What it is |
+|---|---------|------|------------|
+| 1 | Delhi-NCR Boundary | [delhi_ncr_region.geojson](file:///K:/Summer%20Internship/earth-observation-delhi-airshed/data/delhi_ncr_region.geojson) | Administrative boundary of Delhi-NCR (multiple districts as polygons) |
+| 2 | Sentinel-2 RGB Patches | `rgb/` folder (9216 PNGs) | 128×128 pixel satellite images at 10m resolution. Filename = `lat_lon.png` |
+| 3 | Delhi Airshed | [delhi_airshed.geojson](file:///K:/Summer%20Internship/earth-observation-delhi-airshed/data/delhi_airshed.geojson) | Rectangular bounding box (~60×80 km) covering air quality monitoring region |
+| 4 | ESA WorldCover 2021 | [worldcover_bbox_delhi_ncr_2021.tif](file:///K:/Summer%20Internship/earth-observation-delhi-airshed/data/worldcover_bbox_delhi_ncr_2021.tif) | Land cover classification raster (10m resolution), each pixel = a class code |
+
+---
+
+## 🔄 Your Understanding (Corrected)
+
+> *"We are training on dataset-2 and for labeling each image we are seeing the dataset-4 right and we are filtering the images from the NCR Region"*
+
+**Yes, you're mostly right. Here's the precise flow:**
+
+1. **Dataset 2 (RGB images)** = the input images we classify
+2. **Dataset 4 (land cover TIF)** = used to generate **labels** for each image (not used for training directly, only for label extraction)
+3. **Filtering** = we take all 9216 images and keep only those whose center coordinate falls **inside the Delhi-NCR boundary** (Dataset 1), **NOT** the airshed
+4. **Dataset 3 (Airshed)** is only for visualization/context — the grid overlay and understanding the study area
+
+> [!IMPORTANT]
+> The filtering uses **Dataset 1 (NCR boundary)**, not Dataset 3 (Airshed). The code does `gpd.sjoin(img_gdf, ncr_4326, how='inner', predicate='within')` — spatial join against NCR.
+
+---
+
+## 🏗️ The Complete Pipeline (3 Questions)
+
+### Q1: Spatial Reasoning & Data Filtering (4 marks)
+
+**Goal:** Show you understand the geography and can filter data spatially.
+
+```
+Step 1: Load NCR boundary (geojson) → GeoDataFrame
+Step 2: Load Airshed boundary (geojson) → GeoDataFrame  
+Step 3: Reproject both to UTM (EPSG:32644) for metric measurements
+Step 4: Create 60×60 km grid cells covering the NCR extent
+Step 5: Plot everything together → q1_grid_overlay.png
+Step 6: Load all 9216 image filenames, parse lat/lon from filename
+Step 7: Create Point geometry for each image center
+Step 8: Spatial join → keep images INSIDE NCR boundary only
+Step 9: Report: before count, after count, removed count
+Step 10: Plot filtered vs all images → q1_filtered_images.png
+```
+
+**Key code explained:**
+- [parse_coordinates_from_filename("28.3456_77.1234.png")](file:///K:/Summer%20Internship/earth-observation-delhi-airshed/earth_observation.py#115-130) → returns [(28.3456, 77.1234)](file:///K:/Summer%20Internship/earth-observation-delhi-airshed/earth_observation.py#454-456)
+- `gpd.sjoin(img_gdf, ncr_4326, how='inner', predicate='within')` → point-in-polygon test
+- `box(x, y, x+60000, y+60000)` → creates 60km×60km grid squares in UTM coordinates
+
+---
+
+### Q2: Label Construction & Dataset Preparation (6 marks)
+
+**Goal:** Turn unlabeled satellite images into a labeled classification dataset.
+
+```
+Step 1: Open the WorldCover TIF (rasterio)
+Step 2: For each filtered image:
+   a. Take its lat/lon center coordinate
+   b. Convert to pixel position in the TIF (rowcol transform)
+   c. Read a 128×128 window from the TIF at that location
+   d. Count pixel values in the window (ESA class codes)
+   e. Pick the MOST FREQUENT class code = dominant land cover
+   f. Map ESA code → simplified category (5 classes)
+Step 3: Build labeled DataFrame with columns: filename, lat, lon, esa_code, category, label
+Step 4: 60/40 stratified train-test split
+Step 5: Plot class distributions → q2_class_distribution.png
+Step 6: Show sample images per class → q2_sample_images.png
+```
+
+**The label mapping chain:**
+```
+ESA WorldCover pixel value → ESA class name → Simplified category → Numeric label
+
+Example:
+50 → "Built-up" → "Built-up" → 0
+10 → "Tree cover" → "Vegetation" → 1  
+20 → "Shrubland" → "Vegetation" → 1
+40 → "Cropland" → "Cropland" → 2
+80 → "Permanent water" → "Water" → 3
+60 → "Bare/sparse" → "Others" → 4
+```
+
+**5 simplified classes:** Built-up (0), Vegetation (1), Cropland (2), Water (3), Others (4)
+
+**Why modes (most frequent)?** A 128×128 patch may contain multiple land cover types. The **dominant** class gives the most representative single label.
+
+---
+
+### Q3: Model Training & Supervised Evaluation (5 marks)
+
+**Goal:** Train a CNN, evaluate it properly, interpret results.
+
+```
+Step 1: Define data augmentation transforms (flip, rotate, color jitter)
+Step 2: Create PyTorch Dataset/DataLoader classes
+Step 3: Load pretrained ResNet18
+Step 4: Freeze early layers, replace final FC head with custom classifier
+Step 5: Compute class weights for imbalanced loss
+Step 6: Train for 15 epochs with Adam optimizer
+Step 7: Track train/test loss and accuracy per epoch
+Step 8: Save the best model (highest macro F1)
+Step 9: Final evaluation: accuracy, F1-score (macro + weighted)
+Step 10: Generate confusion matrix → q3_confusion_matrix.png
+Step 11: Plot training curves → q3_training_curves.png
+Step 12: Print interpretation of results
+```
+
+**Why ResNet18?** It's a well-established CNN for image classification. Using pretrained weights (transfer learning from ImageNet) means it already knows general visual features (edges, textures, shapes) and only needs to learn satellite-specific patterns.
+
+**Why freeze early layers?** Early layers detect low-level features (edges, gradients) that are universal. Only later layers need to adapt to satellite imagery.
+
+**Custom FC head:**
+```
+ResNet18 backbone → Dropout(0.3) → Linear(512→256) → ReLU → Dropout(0.2) → Linear(256→5)
+```
+
+**Class weighting:** If cropland has 5000 samples and water has 200, the loss function weights water errors 25× more so the model doesn't just predict "cropland" for everything.
+
+---
+
+## 📁 Output Files
+
+| File | From | What it shows |
+|------|------|---------------|
+| `q1_grid_overlay.png` | Q1 | NCR boundary + airshed + 60km grid |
+| `q1_filtered_images.png` | Q1 | All vs filtered image locations |
+| `q2_class_distribution.png` | Q2 | Bar charts: overall, train, test distributions |
+| `q2_sample_images.png` | Q2 | One example image per category |
+| `q3_confusion_matrix.png` | Q3 | Counts + normalized confusion matrices |
+| `q3_training_curves.png` | Q3 | Loss and accuracy over epochs |
+| `best_model.pth` | Q3 | Saved model weights |
+
+---
+
+## 🧠 Key Concepts You Should Be Able to Explain
+
+1. **CRS (Coordinate Reference System):** EPSG:4326 = lat/lon degrees, EPSG:32644 = UTM meters. We use UTM for creating the 60km grid because we need metric distances
+2. **Spatial Join (`sjoin`):** Point-in-polygon test — checks if each image center point falls inside any NCR district polygon
+3. **Rasterio `rowcol`:** Converts geographic coordinates (lat/lon) to pixel coordinates (row/col) in the TIF file
+4. **Transfer Learning:** Using a model pretrained on ImageNet photos and fine-tuning it for satellite images
+5. **Stratified Split:** Ensures each class has proportional representation in both train and test sets
+6. **Macro F1-Score:** Computes F1 per class, then averages — treats all classes equally regardless of size
+7. **Class-weighted CrossEntropy:** Inversely weights the loss by class frequency to handle imbalance

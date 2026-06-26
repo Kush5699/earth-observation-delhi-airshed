@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌍 Delhi Airshed — Earth Observation Datasets on Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+            border-bottom: 1px solid rgba(99, 102, 241, 0.3);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 1000;
+            position: relative;
+        }
+
+        .header h1 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #818cf8, #6366f1, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header .subtitle {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            margin-top: 2px;
+        }
+
+        .header-right {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        /* Map Container */
+        #map {
+            width: 100%;
+            height: calc(100vh - 56px);
+        }
+
+        /* Legend Panel */
+        .legend {
+            position: absolute;
+            bottom: 30px;
+            left: 16px;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            min-width: 240px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .legend h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #c7d2fe;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 5px 0;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .legend-item:hover {
+            opacity: 0.8;
+        }
+
+        .legend-swatch {
+            width: 20px;
+            height: 14px;
+            border-radius: 3px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            flex-shrink: 0;
+        }
+
+        .legend-line {
+            width: 20px;
+            height: 3px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        /* Stats Panel */
+        .stats-panel {
+            position: absolute;
+            top: 70px;
+            right: 16px;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            min-width: 220px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .stats-panel h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #c7d2fe;
+            margin-bottom: 10px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            font-size: 0.78rem;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+        }
+
+        .stat-value {
+            color: #e2e8f0;
+            font-weight: 600;
+        }
+
+        /* Controls Panel */
+        .controls-panel {
+            position: absolute;
+            top: 70px;
+            left: 16px;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            min-width: 240px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .controls-panel h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #c7d2fe;
+            margin-bottom: 10px;
+        }
+
+        .layer-toggle {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 0;
+            font-size: 0.8rem;
+        }
+
+        .layer-toggle input[type="checkbox"] {
+            accent-color: #6366f1;
+            width: 16px;
+            height: 16px;
+        }
+
+        .layer-toggle label {
+            cursor: pointer;
+        }
+
+        /* Tile switcher */
+        .tile-switch {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        .tile-btn {
+            padding: 5px 10px;
+            font-size: 0.72rem;
+            border: 1px solid rgba(99, 102, 241, 0.4);
+            background: rgba(99, 102, 241, 0.15);
+            color: #c7d2fe;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .tile-btn.active {
+            background: #6366f1;
+            color: white;
+            border-color: #6366f1;
+        }
+
+        .tile-btn:hover {
+            background: rgba(99, 102, 241, 0.35);
+        }
+
+        /* Land Cover Legend */
+        .landcover-legend {
+            position: absolute;
+            bottom: 30px;
+            right: 16px;
+            z-index: 1000;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            min-width: 200px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+
+        .landcover-legend h3 {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #c7d2fe;
+            margin-bottom: 10px;
+        }
+
+        /* Tooltip styling */
+        .leaflet-tooltip {
+            background: rgba(15, 23, 42, 0.95) !important;
+            border: 1px solid rgba(99, 102, 241, 0.4) !important;
+            color: #e2e8f0 !important;
+            border-radius: 8px !important;
+            font-family: 'Inter', sans-serif !important;
+            font-size: 0.78rem !important;
+            padding: 8px 12px !important;
+        }
+
+        .leaflet-popup-content-wrapper {
+            background: rgba(15, 23, 42, 0.95) !important;
+            border: 1px solid rgba(99, 102, 241, 0.4) !important;
+            color: #e2e8f0 !important;
+            border-radius: 10px !important;
+            font-family: 'Inter', sans-serif !important;
+        }
+
+        .leaflet-popup-tip {
+            background: rgba(15, 23, 42, 0.95) !important;
+        }
+
+        .patch-popup {
+            font-size: 0.8rem;
+            line-height: 1.5;
+        }
+
+        .patch-popup strong {
+            color: #a5b4fc;
+        }
+
+        .patch-popup img {
+            border-radius: 6px;
+            margin-top: 6px;
+            border: 1px solid rgba(99, 102, 241, 0.3);
+        }
+
+        /* Loading overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            transition: opacity 0.5s;
+        }
+
+        .loading-overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .loading-text {
+            font-size: 1.2rem;
+            color: #818cf8;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 0.5;
+            }
+
+            50% {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Loading -->
+    <div class="loading-overlay" id="loader">
+        <div class="loading-text">🌍 Loading Earth Observation Data...</div>
+    </div>
+
+    <!-- Header -->
+    <div class="header">
+        <div>
+            <h1>🌍 Delhi Airshed — Earth Observation Datasets</h1>
+            <div class="subtitle">AI for Sustainability — SRIP 2026 | IIT Gandhinagar | Kush Patel</div>
+        </div>
+    </div>
+
+    <!-- Map -->
+    <div id="map"></div>
+
+    <!-- Layer Controls -->
+    <div class="controls-panel" id="controls">
+        <h3>📂 Layer Controls</h3>
+        <div class="layer-toggle">
+            <input type="checkbox" id="toggleNCR" checked>
+            <label for="toggleNCR">🔴 Dataset 1 — Delhi-NCR Boundary</label>
+        </div>
+        <div class="layer-toggle">
+            <input type="checkbox" id="toggleAirshed" checked>
+            <label for="toggleAirshed">🔵 Dataset 3 — Delhi Airshed</label>
+        </div>
+        <div class="layer-toggle">
+            <input type="checkbox" id="togglePatches" checked>
+            <label for="togglePatches">📸 Dataset 2 — Satellite Patches</label>
+        </div>
+        <div class="layer-toggle">
+            <input type="checkbox" id="toggleLandcover" checked>
+            <label for="toggleLandcover">🗺️ Dataset 4 — Land Cover (approx)</label>
+        </div>
+        <div class="layer-toggle">
+            <input type="checkbox" id="toggleLabels" checked>
+            <label for="toggleLabels">🏷️ Labels (City/Place Names)</label>
+        </div>
+        <div style="margin-top: 8px; border-top: 1px solid rgba(99,102,241,0.2); padding-top: 8px;">
+            <div style="font-size: 0.75rem; color: #94a3b8; margin-bottom: 6px;">Map Style</div>
+            <div class="tile-switch">
+                <button class="tile-btn" id="btnStreet" onclick="switchTile('street')">Street</button>
+                <button class="tile-btn active" id="btnSatellite" onclick="switchTile('satellite')">Satellite</button>
+                <button class="tile-btn" id="btnTopo" onclick="switchTile('topo')">Topo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Stats Panel -->
+    <div class="stats-panel" id="statsPanel">
+        <h3>📊 Dataset Stats</h3>
+        <div class="stat-row">
+            <span class="stat-label">NCR Districts</span>
+            <span class="stat-value" id="ncrCount">—</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Airshed Area</span>
+            <span class="stat-value">~60×80 km</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Visible Patches</span>
+            <span class="stat-value" id="patchCount">—</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Land Cover Classes</span>
+            <span class="stat-value">5</span>
+        </div>
+    </div>
+
+    <!-- Land Cover Legend -->
+    <div class="landcover-legend" id="lcLegend">
+        <h3>🗺️ Land Cover Classes (Real Data)</h3>
+        <div class="legend-item">
+            <div class="legend-swatch" style="background: #e74c3c;"></div>
+            <span>Built-up (Urban)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-swatch" style="background: #f39c12;"></div>
+            <span>Cropland (Agriculture)</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-swatch" style="background: #27ae60;"></div>
+            <span>Tree Cover</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-swatch" style="background: #1a5e35;"></div>
+            <span>Shrubland</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-swatch" style="background: #8b9467;"></div>
+            <span>Grassland</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-swatch" style="background: #3498db;"></div>
+            <span>Water Bodies</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-swatch" style="background: #95a5a6;"></div>
+            <span>Bare / Sparse</span>
+        </div>
+        <div class="legend-item">
+            <div class="legend-swatch" style="background: #1abc9c;"></div>
+            <span>Herbaceous Wetland</span>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // MAP INITIALIZATION
+        // ========================================
+        const map = L.map('map', {
+            center: [28.6, 77.2],
+            zoom: 9,
+            zoomControl: true
+        });
+
+        // Tile Layers
+        const tiles = {
+            street: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap contributors',
+                maxZoom: 19
+            }),
+            satellite: L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+                attribution: '© Esri, Maxar, Earthstar Geographics',
+                maxZoom: 19
+            }),
+            topo: L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenTopoMap (CC-BY-SA)',
+                maxZoom: 17
+            })
+        };
+
+        // Labels overlay — shows city names, roads, places on top of satellite
+        const labelsOverlay = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {
+            attribution: '© CartoDB',
+            maxZoom: 19,
+            pane: 'overlayPane',
+            zIndex: 650
+        });
+
+        let currentTile = tiles.satellite;
+        currentTile.addTo(map);
+        labelsOverlay.addTo(map); // Labels ON by default
+
+        function switchTile(name) {
+            map.removeLayer(currentTile);
+            currentTile = tiles[name];
+            currentTile.addTo(map);
+            // Keep labels on top
+            if (map.hasLayer(labelsOverlay)) {
+                labelsOverlay.bringToFront();
+            }
+            document.querySelectorAll('.tile-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('btn' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+        }
+
+        // ========================================
+        // DATASET 1: Delhi-NCR Boundary (GeoJSON)
+        // ========================================
+        const ncrStyle = {
+            color: '#ef4444',
+            weight: 2.5,
+            opacity: 0.9,
+            fillColor: '#ef4444',
+            fillOpacity: 0.08,
+            dashArray: null
+        };
+
+        let ncrLayer = null;
+        fetch('data/delhi_ncr_region.geojson')
+            .then(r => r.json())
+            .then(data => {
+                let districtCount = 0;
+                ncrLayer = L.geoJSON(data, {
+                    style: ncrStyle,
+                    onEachFeature: (feature, layer) => {
+                        districtCount++;
+                        const name = feature.properties?.NAME_2 || feature.properties?.name || feature.properties?.NAME || 'NCR District';
+                        layer.bindTooltip(name, { sticky: true });
+                        layer.on('click', () => {
+                            layer.bindPopup(`
+                            <div class="patch-popup">
+                                <strong>📍 ${name}</strong><br>
+                                Dataset: Delhi-NCR Region<br>
+                                Type: Administrative Boundary
+                            </div>
+                        `).openPopup();
+                        });
+                    }
+                }).addTo(map);
+                document.getElementById('ncrCount').textContent = districtCount;
+                checkLoaded();
+            })
+            .catch(e => { console.error('NCR load error:', e); checkLoaded(); });
+
+        // ========================================
+        // DATASET 3: Delhi Airshed (GeoJSON)
+        // ========================================
+        const airshedStyle = {
+            color: '#3b82f6',
+            weight: 3,
+            opacity: 1,
+            fillColor: '#3b82f6',
+            fillOpacity: 0.12,
+            dashArray: '10, 6'
+        };
+
+        let airshedLayer = null;
+        fetch('data/delhi_airshed.geojson')
+            .then(r => r.json())
+            .then(data => {
+                airshedLayer = L.geoJSON(data, {
+                    style: airshedStyle,
+                    onEachFeature: (feature, layer) => {
+                        layer.bindTooltip('Delhi Airshed (~60×80 km)', { sticky: true });
+                        layer.on('click', () => {
+                            layer.bindPopup(`
+                            <div class="patch-popup">
+                                <strong>🌬️ Delhi Airshed</strong><br>
+                                Bounds: 76.85°E – 77.65°E, 28.20°N – 29.00°N<br>
+                                Area: ~60 × 80 km rectangular bounding box<br>
+                                Purpose: Air quality monitoring region
+                            </div>
+                        `).openPopup();
+                        });
+                    }
+                }).addTo(map);
+                checkLoaded();
+            })
+            .catch(e => { console.error('Airshed load error:', e); checkLoaded(); });
+
+        // ========================================
+        // DATASET 4: Real Land Cover from TIF
+        // (Extracted via extract_landcover.py)
+        // ========================================
+        let landcoverLayer = L.layerGroup();
+
+        fetch('data/landcover_grid.json')
+            .then(r => r.json())
+            .then(lcData => {
+                const step = lcData.step;
+                const classes = lcData.classes;
+
+                lcData.cells.forEach(cell => {
+                    const cls = classes[cell.cls];
+                    if (!cls) return;
+
+                    const bounds = [
+                        [cell.lat, cell.lon],
+                        [cell.lat + step, cell.lon + step]
+                    ];
+
+                    const rect = L.rectangle(bounds, {
+                        color: 'transparent',
+                        fillColor: cls.color,
+                        fillOpacity: 0.4,
+                        weight: 0
+                    });
+
+                    rect.bindTooltip(
+                        `🗺️ ${cls.label} (Class ${cell.cls})`,
+                        { sticky: true }
+                    );
+
+                    landcoverLayer.addLayer(rect);
+                });
+
+                landcoverLayer.addTo(map);
+                console.log(`Loaded ${lcData.cells.length} real land cover cells`);
+
+                // Update legend with actual class counts
+                const classCounts = {};
+                lcData.cells.forEach(c => {
+                    const label = classes[c.cls]?.label || '?';
+                    classCounts[label] = (classCounts[label] || 0) + 1;
+                });
+                document.getElementById('lcLegend').querySelector('h3').textContent =
+                    `🗺️ Land Cover (${lcData.cells.length.toLocaleString()} cells)`;
+            })
+            .catch(e => console.error('Land cover load error:', e));
+
+        // ========================================
+        // DATASET 2: Satellite Image Patches
+        // (All 9216 real images from rgb/ folder)
+        // ========================================
+        let patchLayer = L.layerGroup();
+        let patchCount = 0;
+
+        fetch('data/rgb_index.json')
+            .then(r => r.json())
+            .then(files => {
+                files.forEach(fname => {
+                    // Parse lat_lon from filename like "28.2056_76.8558.png"
+                    const parts = fname.replace('.png', '').split('_');
+                    if (parts.length !== 2) return;
+                    const lat = parseFloat(parts[0]);
+                    const lon = parseFloat(parts[1]);
+                    if (isNaN(lat) || isNaN(lon)) return;
+
+                    const marker = L.circleMarker([lat, lon], {
+                        radius: 3,
+                        fillColor: '#fbbf24',
+                        color: '#f59e0b',
+                        weight: 1,
+                        fillOpacity: 0.7
+                    });
+
+                    marker.bindTooltip(`📸 ${fname}`, { sticky: true });
+
+                    marker.on('click', () => {
+                        marker.bindPopup(`
+                        <div class="patch-popup" style="text-align:center; min-width: 160px;">
+                            <strong>📸 Sentinel-2 Patch</strong><br>
+                            <img src="data/rgb/${fname}" 
+                                 alt="${fname}" 
+                                 style="width:140px; height:140px; margin: 6px auto; display:block; object-fit:cover; border-radius:6px; border:1px solid rgba(99,102,241,0.3);"
+                                 loading="lazy">
+                            <span style="font-size:0.72rem; color:#94a3b8;">
+                                📍 ${lat.toFixed(4)}°N, ${lon.toFixed(4)}°E
+                            </span><br>
+                            <span style="font-size:0.7rem; color:#64748b;">${fname}</span>
+                        </div>
+                        `, { maxWidth: 200 }).openPopup();
+                    });
+
+                    patchLayer.addLayer(marker);
+                    patchCount++;
+                });
+
+                patchLayer.addTo(map);
+                document.getElementById('patchCount').textContent = patchCount;
+            })
+            .catch(e => console.error('Patch index load error:', e));
+
+        // ========================================
+        // LAYER TOGGLE CONTROLS
+        // ========================================
+        document.getElementById('toggleNCR').addEventListener('change', (e) => {
+            if (e.target.checked && ncrLayer) map.addLayer(ncrLayer);
+            else if (ncrLayer) map.removeLayer(ncrLayer);
+        });
+
+        document.getElementById('toggleAirshed').addEventListener('change', (e) => {
+            if (e.target.checked && airshedLayer) map.addLayer(airshedLayer);
+            else if (airshedLayer) map.removeLayer(airshedLayer);
+        });
+
+        document.getElementById('togglePatches').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(patchLayer);
+            else map.removeLayer(patchLayer);
+        });
+
+        document.getElementById('toggleLandcover').addEventListener('change', (e) => {
+            if (e.target.checked) map.addLayer(landcoverLayer);
+            else map.removeLayer(landcoverLayer);
+        });
+
+        document.getElementById('toggleLabels').addEventListener('change', (e) => {
+            if (e.target.checked) { map.addLayer(labelsOverlay); labelsOverlay.bringToFront(); }
+            else map.removeLayer(labelsOverlay);
+        });
+
+        // ========================================
+        // LOADING STATE
+        // ========================================
+        let loadedCount = 0;
+        function checkLoaded() {
+            loadedCount++;
+            if (loadedCount >= 2) {
+                setTimeout(() => {
+                    document.getElementById('loader').classList.add('hidden');
+                }, 500);
+            }
+        }
+
+        // Fallback: hide loader after 3s regardless
+        setTimeout(() => {
+            document.getElementById('loader').classList.add('hidden');
+        }, 3000);
+
+    </script>
+</body>
+
+</html>
